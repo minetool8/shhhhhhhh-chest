@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="CC0-1.0"
+
+[[mods]]
+modId="quietly"
+version="1.0.0"
+displayName="Quietly"
+logoFile="icon.png"
+authors="Kafei (original NeoForge mod); Forge 1.20.1 port"
+displayTest="IGNORE_SERVER_VERSION"
+description='''
+Silent opening for chests, trapped chests, barrels, ender chests and shulker boxes. Sneak and right-click once, then keep sneaking while a square progress indicator replaces the crosshair. Install on the server; install on the client too to see the square.
+'''
+
+[[mixins]]
+config="quietly.mixins.json"
+
+[[dependencies.quietly]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.quietly]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
