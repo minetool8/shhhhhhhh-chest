@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "cn.kafei.mixin",
+  "refmap": "quietly.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "ChestMenuMixin",
+    "ShulkerBoxMenuMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

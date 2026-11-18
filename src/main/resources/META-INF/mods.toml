@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="CC0-1.0"
+
+[[mods]]
+modId="quietly"
+version="1.0.0"
+displayName="Quietly"
+logoFile="icon.png"
+authors="Kafei (original NeoForge mod); Forge 1.20.1 port"
+displayTest="IGNORE_SERVER_VERSION"
+description='''
+Server-side silent opening for chests, trapped chests, barrels, ender chests and shulker boxes with a bossbar progress bar. Sneak and right-click once to start, then keep sneaking until it opens. Server required, client optional.
+'''
+
+[[mixins]]
+config="quietly.mixins.json"
+
+[[dependencies.quietly]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.quietly]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
