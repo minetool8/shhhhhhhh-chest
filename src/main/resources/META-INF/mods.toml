@@ -4,7 +4,7 @@ license="CC0-1.0"
 
 [[mods]]
 modId="quietly"
-version="1.0.0"
+version="1.1.0"
 displayName="Quietly"
 logoFile="icon.png"
 authors="Kafei (original NeoForge mod); Forge 1.20.1 port"

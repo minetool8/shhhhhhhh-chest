@@ -19,7 +19,7 @@ The square needs the mod on the **client** as well as the server; it is drawn by
 To also trigger while holding items, set `REQUIRE_EMPTY_HANDS = false` in `QuietlyCommon`.
 
 ## Modded containers
-Any block with a block entity that opens a menu (MenuProvider) works. Vanilla chests/barrels/ender chests/shulkers are
+Any block with a block entity that opens a menu works, plus modded blocks whose block entity is an inventory (Container or item-handler capability). Add blocks to the tag `quietly:ignored` (datapack) to exclude them. Vanilla chests/barrels/ender chests/shulkers are
 handled directly; for everything else Quietly runs the block's normal `use()` after the delay while muting sounds and
 container game events (`ServerLevelMixin`), and mutes the close too (`ServerPlayerMixin`). Modded lids animate through the
 mod's own code. Crafting tables, anvils etc. (no block entity) are untouched.

@@ -1,7 +1,6 @@
 package cn.kafei.mixin;
 
 import cn.kafei.SilentMenuState;
-import cn.kafei.SilentOpenManager;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -17,8 +16,8 @@ public abstract class ShulkerBoxMenuMixin {
             method = "<init>(ILnet/minecraft/world/entity/player/Inventory;Lnet/minecraft/world/Container;)V",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/Container;startOpen(Lnet/minecraft/world/entity/player/Player;)V"))
     private void quietly$startOpen(Container container, Player opener) {
-        if (SilentMenuState.isOpeningSilently()) {
-            SilentMenuState.markSilentMenu((AbstractContainerMenu) (Object) this);
+        if (SilentMenuState.isSkippingStartOpen()) {
+            SilentMenuState.markSkipped((AbstractContainerMenu) (Object) this);
             return;
         }
         container.startOpen(opener);
@@ -29,9 +28,8 @@ public abstract class ShulkerBoxMenuMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/Container;stopOpen(Lnet/minecraft/world/entity/player/Player;)V"))
     private void quietly$stopOpen(Container container, Player player) {
         AbstractContainerMenu menu = (AbstractContainerMenu) (Object) this;
-        if (SilentMenuState.isSilentMenu(menu)) {
-            SilentOpenManager.onSilentMenuClosed(menu);
-            SilentMenuState.clearSilentMenu(menu);
+        if (SilentMenuState.isSkipped(menu)) {
+            SilentMenuState.clearSkipped(menu);
             return;
         }
         container.stopOpen(player);

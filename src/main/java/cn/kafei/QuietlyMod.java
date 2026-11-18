@@ -40,7 +40,7 @@ public class QuietlyMod {
             return;
         }
         if (event.getHand() == InteractionHand.MAIN_HAND) {
-            SilentOpenManager.startOrRefresh(player, event.getPos());
+            SilentOpenManager.startOrRefresh(player, event.getPos(), event.getHitVec());
         }
         // Cancel for both hands so vanilla never opens the container loudly.
         event.setCancellationResult(InteractionResult.SUCCESS);

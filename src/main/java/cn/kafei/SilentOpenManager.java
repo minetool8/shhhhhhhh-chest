@@ -1,10 +1,12 @@
 package cn.kafei;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -23,7 +25,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import cn.kafei.net.QuietlyNetwork;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.ForgeMod;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -33,7 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
-import java.util.OptionalInt;
 
 public final class SilentOpenManager {
     public static final int BASE_OPEN_TICKS = 24;
@@ -47,7 +51,7 @@ public final class SilentOpenManager {
 
     // ------------------------------------------------------------------ public API
 
-    public static void startOrRefresh(ServerPlayer player, BlockPos pos) {
+    public static void startOrRefresh(ServerPlayer player, BlockPos pos, BlockHitResult hit) {
         OpenTarget target = resolveOpenTarget(player, pos);
         if (target == null) {
             cancel(player.getUUID());
@@ -55,11 +59,11 @@ public final class SilentOpenManager {
         }
         ActiveSilentOpen existing = ACTIVE_OPENS.get(player.getUUID());
         if (existing != null && existing.matches(player.serverLevel(), pos)) {
-            existing.refresh(player, target.itemKinds());
+            existing.refresh(target.itemKinds(), hit);
             return;
         }
         cancel(player.getUUID());
-        ACTIVE_OPENS.put(player.getUUID(), new ActiveSilentOpen(player, pos, target.itemKinds()));
+        ACTIVE_OPENS.put(player.getUUID(), new ActiveSilentOpen(player, pos, target.itemKinds(), hit));
     }
 
     public static void tickActiveOpens() {
@@ -127,7 +131,7 @@ public final class SilentOpenManager {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
-        if (block instanceof EnderChestBlock) {
+        if (block instanceof EnderChestBlock && QuietlyCommon.isVanillaContainerBlock(block)) {
             BlockEntity be = level.getBlockEntity(pos);
             BlockPos above = pos.above();
             if (!(be instanceof EnderChestBlockEntity enderChest)
@@ -136,28 +140,55 @@ public final class SilentOpenManager {
             }
             PlayerEnderChestContainer inventory = player.getEnderChestInventory();
             MenuProvider provider = createEnderChestProvider(inventory, enderChest);
-            return new OpenTarget(provider, countKinds(inventory), AnimationTarget.forEnderChest(level, pos));
+            return new OpenTarget(provider, countKinds(inventory), AnimationTarget.forEnderChest(level, pos), false);
         }
 
         MenuProvider provider = state.getMenuProvider(level, pos);
+        BlockEntity be = level.getBlockEntity(pos);
+
+        if (!QuietlyCommon.isVanillaContainerBlock(block)) {
+            // Modded / other containers: run the block's own use() later, with sounds muted.
+            if (be == null || !QuietlyCommon.isSupportedSilentContainer(level, pos)) {
+                return null;
+            }
+            return new OpenTarget(provider, countStoredKinds(be), null, true);
+        }
+
         if (provider == null) {
             return null;
         }
 
         if (block instanceof ChestBlock chestBlock) {
             Container container = ChestBlock.getContainer(chestBlock, state, level, pos, false);
-            return new OpenTarget(provider, countKinds(container), AnimationTarget.forChest(level, pos, state));
+            return new OpenTarget(provider, countKinds(container), AnimationTarget.forChest(level, pos, state), false);
         }
 
-        BlockEntity be = level.getBlockEntity(pos);
         int kinds = be instanceof Container c ? countKinds(c) : 0;
         if (block instanceof BarrelBlock) {
-            return new OpenTarget(provider, kinds, AnimationTarget.forBarrel(level, pos));
+            return new OpenTarget(provider, kinds, AnimationTarget.forBarrel(level, pos), false);
         }
         if (block instanceof ShulkerBoxBlock) {
-            return new OpenTarget(provider, kinds, AnimationTarget.forShulkerBox(level, pos));
+            return new OpenTarget(provider, kinds, AnimationTarget.forShulkerBox(level, pos), false);
         }
-        return new OpenTarget(provider, kinds, null);
+        return null;
+    }
+
+    private static int countStoredKinds(BlockEntity be) {
+        if (be instanceof Container container) {
+            return countKinds(container);
+        }
+        int[] result = new int[1];
+        be.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(handler -> {
+            Set<Item> kinds = new HashSet<>();
+            for (int slot = 0; slot < handler.getSlots(); slot++) {
+                ItemStack stack = handler.getStackInSlot(slot);
+                if (!stack.isEmpty()) {
+                    kinds.add(stack.getItem());
+                }
+            }
+            result[0] = kinds.size();
+        });
+        return result[0];
     }
 
     private static MenuProvider createEnderChestProvider(PlayerEnderChestContainer inventory, EnderChestBlockEntity chest) {
@@ -181,12 +212,21 @@ public final class SilentOpenManager {
         return kinds.size();
     }
 
-    private static void openSilently(ServerPlayer player, OpenTarget target) {
-        SilentMenuState.beginSilentOpen();
+    private static void openSilently(ServerPlayer player, BlockPos pos, OpenTarget target, @Nullable BlockHitResult hit) {
+        // Vanilla containers: skip startOpen/stopOpen and animate ourselves.
+        // Everything else: let the block do its normal use(), with sounds/events muted.
+        SilentMenuState.beginSilentOpen(!target.viaUse());
         try {
-            OptionalInt id = player.openMenu(target.menuProvider());
+            if (target.viaUse()) {
+                ServerLevel level = player.serverLevel();
+                BlockHitResult useHit = hit != null ? hit
+                        : new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
+                level.getBlockState(pos).use(level, player, InteractionHand.MAIN_HAND, useHit);
+            } else {
+                player.openMenu(target.menuProvider());
+            }
             AbstractContainerMenu menu = player.containerMenu;
-            if (id.isPresent() && menu != player.inventoryMenu) {
+            if (menu != player.inventoryMenu) {
                 SilentMenuState.markSilentMenu(menu);
                 registerOpenAnimation(menu, target.animationTarget());
             }
@@ -210,7 +250,7 @@ public final class SilentOpenManager {
 
     // ------------------------------------------------------------------ types
 
-    private record OpenTarget(MenuProvider menuProvider, int itemKinds, @Nullable AnimationTarget animationTarget) {}
+    private record OpenTarget(@Nullable MenuProvider menuProvider, int itemKinds, @Nullable AnimationTarget animationTarget, boolean viaUse) {}
 
     private enum AnimationType { CHEST, ENDER_CHEST, BARREL, SHULKER_BOX }
 
@@ -284,8 +324,11 @@ public final class SilentOpenManager {
         private final BlockPos pos;
         private int totalTicks;
         private int elapsedTicks;
+        @Nullable
+        private BlockHitResult hit;
 
-        ActiveSilentOpen(ServerPlayer player, BlockPos pos, int itemKinds) {
+        ActiveSilentOpen(ServerPlayer player, BlockPos pos, int itemKinds, BlockHitResult hit) {
+            this.hit = hit;
             this.player = player;
             this.level = player.serverLevel();
             this.pos = pos.immutable();
@@ -301,8 +344,9 @@ public final class SilentOpenManager {
             return this.level == otherLevel && this.pos.equals(otherPos);
         }
 
-        void refresh(ServerPlayer p, int itemKinds) {
+        void refresh(int itemKinds, BlockHitResult newHit) {
             this.totalTicks = ticksFor(itemKinds);
+            this.hit = newHit;
         }
 
         /** @return true when this open is finished (opened or cancelled) and should be removed. */
@@ -317,7 +361,7 @@ public final class SilentOpenManager {
                 OpenTarget target = resolveOpenTarget(player, pos);
                 close();
                 if (target != null) {
-                    openSilently(player, target);
+                    openSilently(player, pos, target, hit);
                 }
                 return true;
             }
