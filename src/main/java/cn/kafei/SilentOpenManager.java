@@ -2,10 +2,8 @@ package cn.kafei;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.BossEvent;
 import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
@@ -24,13 +22,13 @@ import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.ChestType;
+import cn.kafei.net.QuietlyNetwork;
 import net.minecraftforge.common.ForgeMod;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -38,8 +36,8 @@ import java.util.WeakHashMap;
 import java.util.OptionalInt;
 
 public final class SilentOpenManager {
-    public static final int BASE_OPEN_TICKS = 12;
-    public static final int TICKS_PER_ITEM_KIND = 4;
+    public static final int BASE_OPEN_TICKS = 24;
+    public static final int TICKS_PER_ITEM_KIND = 8;
 
     private static final Map<UUID, ActiveSilentOpen> ACTIVE_OPENS = new HashMap<>();
     private static final Map<AbstractContainerMenu, AnimationTarget> MENU_ANIMATIONS = new WeakHashMap<>();
@@ -284,7 +282,6 @@ public final class SilentOpenManager {
         private final ServerPlayer player;
         private final ServerLevel level;
         private final BlockPos pos;
-        private final ServerBossEvent bossBar;
         private int totalTicks;
         private int elapsedTicks;
 
@@ -293,10 +290,7 @@ public final class SilentOpenManager {
             this.level = player.serverLevel();
             this.pos = pos.immutable();
             this.totalTicks = ticksFor(itemKinds);
-            this.bossBar = new ServerBossEvent(createBossBarName(totalTicks),
-                    BossEvent.BossBarColor.BLUE, BossEvent.BossBarOverlay.PROGRESS);
-            this.bossBar.setProgress(0.0F);
-            this.bossBar.addPlayer(player);
+            QuietlyNetwork.sendProgress(player, 0.0F);
         }
 
         private static int ticksFor(int itemKinds) {
@@ -318,8 +312,7 @@ public final class SilentOpenManager {
                 return true;
             }
             elapsedTicks++;
-            bossBar.setProgress(Math.min(1.0F, (float) elapsedTicks / (float) Math.max(1, totalTicks)));
-            bossBar.setName(createBossBarName(Math.max(0, totalTicks - elapsedTicks)));
+            QuietlyNetwork.sendProgress(player, Math.min(1.0F, (float) elapsedTicks / (float) Math.max(1, totalTicks)));
             if (elapsedTicks >= totalTicks) {
                 OpenTarget target = resolveOpenTarget(player, pos);
                 close();
@@ -332,15 +325,7 @@ public final class SilentOpenManager {
         }
 
         void close() {
-            bossBar.removePlayer(player);
-        }
-
-        private static Component createBossBarName(int ticksLeft) {
-            return Component.translatableWithFallback(
-                    "quietly.silent_open.progress",
-                    "Silent opening: %s seconds left, keep holding %s",
-                    String.format(Locale.ROOT, "%.1f", ticksLeft / 20.0D),
-                    Component.keybind("key.sneak"));
+            QuietlyNetwork.sendProgress(player, -1.0F);
         }
     }
 }

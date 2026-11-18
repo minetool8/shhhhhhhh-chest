@@ -9,11 +9,13 @@ Locally:
 1. Download the official Forge 1.20.1 MDK and copy `gradlew`, `gradlew.bat` and the `gradle/` folder into this directory
    (or copy this project's `src/` + `build.gradle` over the MDK).
 2. `./gradlew build`  ->  `build/libs/quietly-1.0.0+forge1.20.1.jar`
-3. Put the jar in the server's `mods/` folder (clients don't need it).
+3. Put the jar in the server's `mods/` folder (install on clients too to see the square).
 
 ## Behaviour
 Sneak + right-click a chest / trapped chest / barrel / ender chest / shulker box with empty hands,
-keep sneaking until the boss bar fills (12 ticks + 4 per distinct item type), and it opens silently.
+keep sneaking while the square progress indicator (replaces the crosshair, no text) fills, and it opens silently.
+Timing: `BASE_OPEN_TICKS = 24` + `TICKS_PER_ITEM_KIND = 8` in `SilentOpenManager` (2x the original's 12 + 4).
+The square needs the mod on the **client** as well as the server; it is drawn by a server->client packet.
 To also trigger while holding items, set `REQUIRE_EMPTY_HANDS = false` in `QuietlyCommon`.
 
 ## Differences from the original

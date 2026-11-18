@@ -1,6 +1,7 @@
 package cn.kafei;
 
 import com.mojang.logging.LogUtils;
+import cn.kafei.net.QuietlyNetwork;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -25,6 +26,7 @@ public class QuietlyMod {
         // Server-side mod: clients without it may still join.
         ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class,
                 () -> new IExtensionPoint.DisplayTest(() -> NetworkConstants.IGNORESERVERONLY, (remote, fromServer) -> true));
+        QuietlyNetwork.register();
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("Quietly (Forge 1.20.1 port) initialized");
     }
