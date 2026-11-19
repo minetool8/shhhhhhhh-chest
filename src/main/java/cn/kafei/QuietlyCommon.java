@@ -23,10 +23,11 @@ public final class QuietlyCommon {
     public static final TagKey<Block> IGNORED = TagKey.create(Registries.BLOCK, new ResourceLocation("quietly", "ignored"));
 
     /**
-     * If true, silent opening only starts when both hands are empty, so sneak-placing
-     * blocks against a chest still works. Set to false to trigger on any sneak + right-click.
+     * If true, silent opening only starts when both hands are empty. Default is false so held items
+     * (TACZ guns in either hand, tools, blocks...) never stop you from opening quietly.
+     * Note: with false, sneak + right-click on a container no longer places a held block against it.
      */
-    public static final boolean REQUIRE_EMPTY_HANDS = true;
+    public static final boolean REQUIRE_EMPTY_HANDS = false;
 
     private QuietlyCommon() {}
 

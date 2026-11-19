@@ -12,17 +12,24 @@ Locally:
 3. Put the jar in the server's `mods/` folder (install on clients too to see the square).
 
 ## Behaviour
-Sneak + right-click a chest / trapped chest / barrel / ender chest / shulker box with empty hands,
-keep sneaking while the square progress indicator (replaces the crosshair, no text) fills, and it opens silently.
+Hold crouch and hold right-click on a chest / trapped chest / barrel / ender chest / shulker box (held items don't matter),
+keep both held while the square progress indicator (replaces the crosshair, no text) fills, and it opens silently.
 Timing: `BASE_OPEN_TICKS = 24` + `TICKS_PER_ITEM_KIND = 8` in `SilentOpenManager` (2x the original's 12 + 4).
 The square needs the mod on the **client** as well as the server; it is drawn by a server->client packet.
-To also trigger while holding items, set `REQUIRE_EMPTY_HANDS = false` in `QuietlyCommon`.
+Releasing crouch or right-click cancels. Set `REQUIRE_HOLDING_CLICK = false` in `SilentOpenManager` to only need crouch after the first click,
+or `REQUIRE_EMPTY_HANDS = true` in `QuietlyCommon` to require empty hands.
 
 ## Modded containers
 Any block with a block entity that opens a menu works, plus modded blocks whose block entity is an inventory (Container or item-handler capability). Add blocks to the tag `quietly:ignored` (datapack) to exclude them. Vanilla chests/barrels/ender chests/shulkers are
 handled directly; for everything else Quietly runs the block's normal `use()` after the delay while muting sounds and
 container game events (`ServerLevelMixin`), and mutes the close too (`ServerPlayerMixin`). Modded lids animate through the
 mod's own code. Crafting tables, anvils etc. (no block entity) are untouched.
+
+## Rummage compatibility
+Optional, reflection-based (no Rummage jar needed to build). Quietly loads after Rummage, Rummage's normal open
+hooks still fire for silently opened menus, and the silent-open timer only counts item kinds in slots the player has
+already rummaged (so unsearched loot doesn't change the delay). If Rummage's API ever changes, the integration turns
+itself off and logs a warning.
 
 ## Differences from the original
 - Rewritten from the compiled classes, not copied line-for-line.

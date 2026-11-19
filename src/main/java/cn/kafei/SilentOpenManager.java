@@ -43,6 +43,14 @@ public final class SilentOpenManager {
     public static final int BASE_OPEN_TICKS = 24;
     public static final int TICKS_PER_ITEM_KIND = 8;
 
+    /** If true you must keep holding right-click (and crouch) for the whole time; releasing cancels. */
+    public static final boolean REQUIRE_HOLDING_CLICK = true;
+    /**
+     * The client re-sends the use packet roughly every 4-5 ticks while right-click is held, so a click
+     * older than this many server ticks means the button was released.
+     */
+    public static final int HOLD_TIMEOUT_TICKS = 10;
+
     private static final Map<UUID, ActiveSilentOpen> ACTIVE_OPENS = new HashMap<>();
     private static final Map<AbstractContainerMenu, AnimationTarget> MENU_ANIMATIONS = new WeakHashMap<>();
     private static final Map<AnimationKey, Integer> ANIMATION_REF_COUNTS = new HashMap<>();
@@ -140,7 +148,7 @@ public final class SilentOpenManager {
             }
             PlayerEnderChestContainer inventory = player.getEnderChestInventory();
             MenuProvider provider = createEnderChestProvider(inventory, enderChest);
-            return new OpenTarget(provider, countKinds(inventory), AnimationTarget.forEnderChest(level, pos), false);
+            return new OpenTarget(provider, countKinds(player, inventory), AnimationTarget.forEnderChest(level, pos), false);
         }
 
         MenuProvider provider = state.getMenuProvider(level, pos);
@@ -151,7 +159,7 @@ public final class SilentOpenManager {
             if (be == null || !QuietlyCommon.isSupportedSilentContainer(level, pos)) {
                 return null;
             }
-            return new OpenTarget(provider, countStoredKinds(be), null, true);
+            return new OpenTarget(provider, countStoredKinds(player, be), null, true);
         }
 
         if (provider == null) {
@@ -160,10 +168,10 @@ public final class SilentOpenManager {
 
         if (block instanceof ChestBlock chestBlock) {
             Container container = ChestBlock.getContainer(chestBlock, state, level, pos, false);
-            return new OpenTarget(provider, countKinds(container), AnimationTarget.forChest(level, pos, state), false);
+            return new OpenTarget(provider, countKinds(player, container), AnimationTarget.forChest(level, pos, state), false);
         }
 
-        int kinds = be instanceof Container c ? countKinds(c) : 0;
+        int kinds = be instanceof Container c ? countKinds(player, c) : 0;
         if (block instanceof BarrelBlock) {
             return new OpenTarget(provider, kinds, AnimationTarget.forBarrel(level, pos), false);
         }
@@ -173,9 +181,9 @@ public final class SilentOpenManager {
         return null;
     }
 
-    private static int countStoredKinds(BlockEntity be) {
+    private static int countStoredKinds(ServerPlayer player, BlockEntity be) {
         if (be instanceof Container container) {
-            return countKinds(container);
+            return countKinds(player, container);
         }
         int[] result = new int[1];
         be.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(handler -> {
@@ -198,14 +206,14 @@ public final class SilentOpenManager {
                 Component.translatable("container.enderchest"));
     }
 
-    private static int countKinds(@Nullable Container container) {
+    private static int countKinds(ServerPlayer player, @Nullable Container container) {
         if (container == null) {
             return 0;
         }
         Set<Item> kinds = new HashSet<>();
         for (int slot = 0; slot < container.getContainerSize(); slot++) {
             ItemStack stack = container.getItem(slot);
-            if (!stack.isEmpty()) {
+            if (!stack.isEmpty() && RummageCompat.isSlotVisible(player, container, slot)) {
                 kinds.add(stack.getItem());
             }
         }
@@ -324,11 +332,13 @@ public final class SilentOpenManager {
         private final BlockPos pos;
         private int totalTicks;
         private int elapsedTicks;
+        private int lastClickTick;
         @Nullable
         private BlockHitResult hit;
 
         ActiveSilentOpen(ServerPlayer player, BlockPos pos, int itemKinds, BlockHitResult hit) {
             this.hit = hit;
+            this.lastClickTick = player.server.getTickCount();
             this.player = player;
             this.level = player.serverLevel();
             this.pos = pos.immutable();
@@ -347,12 +357,17 @@ public final class SilentOpenManager {
         void refresh(int itemKinds, BlockHitResult newHit) {
             this.totalTicks = ticksFor(itemKinds);
             this.hit = newHit;
+            this.lastClickTick = player.server.getTickCount();
         }
 
         /** @return true when this open is finished (opened or cancelled) and should be removed. */
         boolean tick() {
             if (!canKeepOpening(player, level, pos)) {
                 close();
+                return true;
+            }
+            if (REQUIRE_HOLDING_CLICK && player.server.getTickCount() - lastClickTick > HOLD_TIMEOUT_TICKS) {
+                close(); // right-click released
                 return true;
             }
             elapsedTicks++;
